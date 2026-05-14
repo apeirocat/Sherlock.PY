@@ -13,6 +13,10 @@ THANK YOU FOR USING SHERLOCK!
 """
 
 
+LAST_HEARTBEAT = time.perf_counter()
+WATCHDOG_THREAD = None
+WATCHDOG_HEARTBEAT = time.perf_counter()
+WATCHDOG_CONFIG = []
 
 SETTINGS_LOCKED = "SHERLOCK_SETTINGS_NOT_LOCKED"
 
@@ -258,7 +262,7 @@ def rt_integrity_chk(func):
         return True
 def __autochkloop(call,interval):
     rt_integrity_chk(call)
-    global HASH_LIST,__autochkthread,CRITICAL
+    global HASH_LIST,__autochkthread,CRITICAL, LAST_HEARTBEAT
     while True:
         if __autochkthread.stop:
             break
@@ -328,6 +332,17 @@ def __autochkloop(call,interval):
         checks_copy = CHECKS.copy()
         for func in checks_copy:
             func(call)
+
+        # WATCHDOG HEARTBEAT CHECK
+        if WATCHDOG_THREAD is not None:
+            if WATCHDOG_THREAD.is_alive():
+                if (time.perf_counter() - WATCHDOG_HEARTBEAT) > WATCHDOG_CONFIG[0]:
+                    print("> WATCHDOG LOOP LOST")
+                    os._exit(0xDEAD)
+            else:
+                print("> WATCHDOG THREAD DEAD")
+                os._exit(0xDEAD)
+        LAST_HEARTBEAT = time.perf_counter()
         time.sleep(interval)
 def auto_chk_enable(func,interval = 30):
     if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
@@ -472,8 +487,63 @@ def lock_settings():
     SETTINGS_LOCKED = "SHERLOCK_SETTINGS_LOCKED"   
     constant_hashcheck("SETTINGS LOCKED FLAG", SETTINGS_LOCKED)
 
+def check_thread_activity(threshold =10):
+    return (time.perf_counter() - LAST_HEARTBEAT) < threshold
 
+def __watchdog_loop(timeout):
+    global WATCHDOG_HEARTBEAT
 
+    while True:
+        if WATCHDOG_THREAD.stop:
+            break
+
+        WATCHDOG_HEARTBEAT = time.perf_counter()
+
+        if not check_thread_activity():
+            print("> RTI LOOP LOST")
+            os._exit(0xDEAD)
+
+        time.sleep(1)
+
+def watchdog_enable(timeout=10):
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
+
+    global WATCHDOG_THREAD, WATCHDOG_CONFIG
+
+    if WATCHDOG_THREAD is not None:
+        if WATCHDOG_THREAD.is_alive():
+            print("> WATCHDOG ALREADY RUNNING")
+            return False
+
+    WATCHDOG_CONFIG = [timeout]
+
+    WATCHDOG_THREAD = threading.Thread(
+        target=__watchdog_loop,
+        args=(timeout,)
+    )
+
+    WATCHDOG_THREAD.stop = False
+    WATCHDOG_THREAD.start()
+
+    return True
+def watchdog_disable():
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
+
+    global WATCHDOG_THREAD
+
+    if WATCHDOG_THREAD is None:
+        return False
+
+    WATCHDOG_THREAD.stop = True
+    WATCHDOG_THREAD.join()
+
+    WATCHDOG_THREAD = None
+
+    return True
 CRITICAL=[
           audit_hook_enable,
           audithook,
@@ -501,7 +571,11 @@ CRITICAL=[
           AUDIT_HOOK_FUNCTIONS.LOCK_TRACE,
           add_audit_hook,
           remove_audit_hook,
-          lock_settings
+          lock_settings,
+          check_thread_activity,
+          watchdog_enable,
+          watchdog_disable,
+          __watchdog_loop
         ]
 
 

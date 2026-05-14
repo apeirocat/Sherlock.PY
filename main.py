@@ -56,6 +56,13 @@ def main():
     #Note it is recommended to NOT enable AUTO_CHK before all the features needed are added. Stopping the auto_chk thread takes time, and will make your app lag significantly while adding features.
     #But if you must enable AUTO_CHK before features are added, use the auto_chk_disable before and auto_chk_enable after the adding of features.
 
+    #Watchdog thread that monitors the AUTOCHK loop to make attackers unable to kill it.
+    #When enabled AUTOCHK loop will monitor WATCHDOG loop, 
+    #and WATCHDOG loop will monitor AUTOCHK loop.
+    sherlock.watchdog_enable(4) # argument is the time threshold where the thread is considered "LOST"
+
+
+
     #As a final step, we lock the settings, so attackers can not call disable functions or tamper with our settings.
     sherlock.lock_settings()
     #BUT, IF YOU USE THIS, YOU CAN NOT TOGGLE ANY SETTING LIKE:
@@ -76,6 +83,11 @@ def main():
     while True:
         do_shit(i)
         i += 1
+
+        #If you dont want to use the WatchDog feature you can do this to check if the sherlock thread is working.
+        if not sherlock.check_thread_activity(5): #takes a threshold like watchdog again.
+            print("> Sherlock main thread compromised!")
+            sherlock.os._exit(0xDEAD)
 
 
 main()
