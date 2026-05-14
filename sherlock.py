@@ -14,8 +14,7 @@ THANK YOU FOR USING SHERLOCK!
 
 
 
-
-
+SETTINGS_LOCKED = "SHERLOCK_SETTINGS_NOT_LOCKED"
 
 CHECKS = []
 checks_hash = ""
@@ -33,6 +32,9 @@ _SECRET = hashlib.sha256(
     f"{id(object)}{time.perf_counter_ns()}".encode()
 ).hexdigest()
 
+
+_REAL_EXIT = os._exit
+_REAL_COMPARE = hmac.compare_digest
 
 class AUDIT_HOOK_FUNCTIONS():
     def LOCK_IMPORTS(event,args):
@@ -306,12 +308,31 @@ def __autochkloop(call,interval):
                 else:
                     call(AUTO_CHECK_FUNCTIONS.FUNCTION_INTEGRITY)
 
+        #Settings lock constant
+        if "SETTINGS LOCKED FLAG" in CONSTANT_LIST:
+            if not constant_hashcheck("SETTINGS LOCKED FLAG", SETTINGS_LOCKED):
+                print("> SETTINGS LOCK IS BEING TAMPERED WITH")
+                os._exit(0xDEAD)
+
+        #builtins
+        if os._exit is not _REAL_EXIT:
+            print("> OS._EXIT != FROZEN OS._EXIT")
+            _REAL_EXIT(0xDEAD) #hopefully realexit is real
+
+            
+            
+        if hmac.compare_digest is not _REAL_COMPARE:
+            print("> HMAC.COMPARE_DIGEST != FROZEN HMAC.COMPARE_DIGEST")
+            os._exit(0xDEAD)
 
         checks_copy = CHECKS.copy()
         for func in checks_copy:
             func(call)
         time.sleep(interval)
 def auto_chk_enable(func,interval = 30):
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
     global __autochkthread,AUTOCHECK_CONFIG
 
     if not __autochkthread == None:
@@ -324,6 +345,9 @@ def auto_chk_enable(func,interval = 30):
     __autochkthread.stop = False
     __autochkthread.start()
 def auto_chk_disable():
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
     global __autochkthread
     if __autochkthread == None:
         return False
@@ -332,6 +356,9 @@ def auto_chk_disable():
     __autochkthread = None
     return True
 def add_auto_check(func):
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
     global checks_hash
     thread_state = False
     if __autochkthread is not None:
@@ -344,6 +371,9 @@ def add_auto_check(func):
     if thread_state == True:
         auto_chk_enable(AUTOCHECK_CONFIG[0],AUTOCHECK_CONFIG[1])
 def remove_auto_check(func):
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
     global checks_hash
     thread_state = False
     if __autochkthread is not None:
@@ -395,6 +425,9 @@ def protect_method(cls,name):
 
 
 def add_audit_hook(func):
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
     global audithook_hash
     thread_state = False
     if __autochkthread is not None:
@@ -407,6 +440,9 @@ def add_audit_hook(func):
     if thread_state == True:
         auto_chk_enable(AUTOCHECK_CONFIG[0],AUTOCHECK_CONFIG[1])
 def remove_audit_hook(func):
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)
     global audithook_hash,__autochkthread
     thread_state = False
     if __autochkthread is not None:
@@ -425,8 +461,16 @@ def audithook(event,args):
         func(event,args)
 
 def audit_hook_enable():
+    if SETTINGS_LOCKED == "SHERLOCK_SETTINGS_LOCKED":
+        print("> SETTINGS LOCKED")
+        os._exit(0xDEAD)  
     __import__("sys").addaudithook(audithook)
 
+
+def lock_settings():
+    global SETTINGS_LOCKED
+    SETTINGS_LOCKED = "SHERLOCK_SETTINGS_LOCKED"   
+    constant_hashcheck("SETTINGS LOCKED FLAG", SETTINGS_LOCKED)
 
 
 
@@ -456,7 +500,8 @@ CRITICAL=[
           AUDIT_HOOK_FUNCTIONS.LOCK_INPUT,
           AUDIT_HOOK_FUNCTIONS.LOCK_TRACE,
           add_audit_hook,
-          remove_audit_hook
+          remove_audit_hook,
+          lock_settings
         ]
 
 
